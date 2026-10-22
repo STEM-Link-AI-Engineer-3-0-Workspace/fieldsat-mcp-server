@@ -5,6 +5,7 @@ from fastmcp import FastMCP
 from . import __version__
 from .domain.fields import REGISTERED_FIELDS, FieldLookup, RegisteredField, find_registered_field
 from .providers.base import SatelliteEvidenceProvider, WeatherEvidenceProvider
+from .tools import register_field_tools
 
 INSTRUCTIONS = (
     "Read-only field-level satellite and weather evidence for Sri Lankan agricultural fields. "
@@ -24,5 +25,5 @@ def create_server(
         instructions=INSTRUCTIONS,
         version=__version__,
     )
-    # Tools, resources and prompts are registered here from step 01 onwards.
+    register_field_tools(mcp, fields)
     return mcp

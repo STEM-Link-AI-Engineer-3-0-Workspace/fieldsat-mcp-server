@@ -31,6 +31,9 @@ def create_server(
         name="STEM Link Satellite MCP",
         instructions=INSTRUCTIONS,
         version=__version__,
+        # Unexpected exceptions reach the client as a generic message, not a stack trace.
+        # ToolError messages are always sent in full.
+        mask_error_details=True,
     )
     register_field_tools(mcp, fields)
     register_satellite_tools(mcp, satellite_provider, find_field)

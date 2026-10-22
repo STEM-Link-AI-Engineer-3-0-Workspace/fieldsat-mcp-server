@@ -15,7 +15,7 @@ from fieldsat.domain.errors import (
 from fieldsat.domain.fields import FieldLookup
 from fieldsat.domain.satellite import get_satellite_analysis as build_satellite_analysis
 from fieldsat.providers.base import SatelliteEvidenceProvider
-from fieldsat.tools.common import READ_ONLY, FieldId
+from fieldsat.tools.common import READ_ONLY, TOOL_TIMEOUT_SECONDS, FieldId
 
 
 def register_satellite_tools(
@@ -25,6 +25,7 @@ def register_satellite_tools(
         name="get_satellite_analysis",
         title="Get satellite analysis",
         annotations=READ_ONLY,
+        timeout=TOOL_TIMEOUT_SECONDS,
     )
     async def get_satellite_analysis(
         field_id: FieldId,

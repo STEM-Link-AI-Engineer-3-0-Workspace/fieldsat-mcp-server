@@ -15,7 +15,7 @@ from ..domain.errors import (
 from ..domain.fields import FieldLookup
 from ..domain.weather import get_weather_context as build_weather_context
 from ..providers.base import WeatherEvidenceProvider
-from .common import READ_ONLY, FieldId
+from .common import READ_ONLY, TOOL_TIMEOUT_SECONDS, FieldId
 
 
 def register_weather_tools(
@@ -25,6 +25,7 @@ def register_weather_tools(
         name="get_weather_context",
         title="Get weather context",
         annotations=READ_ONLY,
+        timeout=TOOL_TIMEOUT_SECONDS,
     )
     async def get_weather_context(
         field_id: FieldId,

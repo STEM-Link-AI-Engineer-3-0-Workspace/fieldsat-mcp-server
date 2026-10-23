@@ -15,7 +15,7 @@ from ..domain.errors import (
 from ..domain.fields import FieldLookup
 from ..domain.satellite import get_satellite_analysis as build_satellite_analysis
 from ..providers.base import SatelliteEvidenceProvider
-from .common import READ_ONLY, FieldId
+from .common import READ_ONLY, TOOL_TIMEOUT_SECONDS, FieldId
 
 
 def register_satellite_tools(
@@ -25,6 +25,7 @@ def register_satellite_tools(
         name="get_satellite_analysis",
         title="Get satellite analysis",
         annotations=READ_ONLY,
+        timeout=TOOL_TIMEOUT_SECONDS,
     )
     async def get_satellite_analysis(
         field_id: FieldId,

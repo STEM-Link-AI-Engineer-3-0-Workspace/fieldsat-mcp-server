@@ -6,13 +6,13 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
 from fieldsat.domain.errors import SourceUnavailableError
 from fieldsat.domain.evidence import WeatherEvidence, WeatherHour
-from fieldsat.domain.fields import RegisteredField
+from fieldsat.domain.fields import AUTO_TIME_ZONE, RegisteredField
 from fieldsat.domain.geometry import centroid
 from fieldsat.providers.http_retry import Jitter, Sleep, log_provider_event, request_with_retry
 
@@ -41,6 +41,15 @@ def _number(value: object, label: str, *, optional: bool = False) -> float | Non
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{label} must be numeric.")
     return float(value)
+
+
+def _time_zone(name: object, label: str) -> ZoneInfo:
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"{label} must be a time zone name.")
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise ValueError(f"{label} is not a known time zone.") from error
 
 
 def _local_timestamp(value: object, time_zone: ZoneInfo, label: str) -> datetime:
@@ -114,13 +123,19 @@ class OpenMeteoWeatherProvider:
             response = await self._get(params, correlation_id)
             response.raise_for_status()
             payload: object = response.json()
-            hours = self._parse_hours(payload, ZoneInfo(field.time_zone))
+            # With "auto", Open-Meteo picks the time zone from the coordinates and names it.
+            time_zone = _time_zone(
+                _mapping(payload, "response").get("timezone")
+                if field.time_zone == AUTO_TIME_ZONE
+                else field.time_zone,
+                "timezone",
+            )
+            hours = self._parse_hours(payload, time_zone)
         except (httpx.HTTPError, ValueError, TypeError) as error:
             raise SourceUnavailableError(
                 "weather", "Open-Meteo did not return valid hourly weather data."
             ) from error
 
-        time_zone = ZoneInfo(field.time_zone)
         now = self._clock()
         if now.tzinfo is None:
             raise SourceUnavailableError("weather", "The provider clock must be timezone-aware.")

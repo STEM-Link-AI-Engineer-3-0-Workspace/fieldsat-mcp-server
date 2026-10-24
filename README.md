@@ -54,6 +54,14 @@ The MCP Python SDK diverts `print()` to stderr once the server is running, but o
 printed before that, or by a child process, lands in the protocol stream, and many
 clients drop a server that writes non-JSON to stdout.
 
+## Fields: built in or from a file
+
+By default both modes serve the four built-in fields. To serve your own,
+write a GeoJSON FeatureCollection like [`fields.example.geojson`](fields.example.geojson) and
+pass it with `--fields my-fields.geojson` or `FIELDSAT_FIELDS_FILE=my-fields.geojson`. Each
+feature is a Polygon with `id`, `name`, `crop` (`paddy` or `tea`) and an optional `time_zone`
+(an IANA name; default `auto`, which takes the zone from the field's location).
+
 ## Demo mode
 
 `--demo` (or `STEMLINK_MCP_DEMO=1`) serves fixed numbers for the four real zones and adds
@@ -65,6 +73,8 @@ four verification fields that misbehave on purpose:
 | `SL-PADDY-SAT-FAIL` | Satellite tool fails with a 503; weather still works |
 | `SL-PADDY-WEATHER-FAIL` | Weather tool fails with a 503; satellite still works |
 | `SL-PADDY-SLOW` | Satellite tool takes 20 seconds |
+
+With `--fields`, demo mode serves your fields with canonical numbers, plus these four.
 
 ## Live data
 

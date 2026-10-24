@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 
-from fieldsat.runtime import create_demo_server, create_live_server
+from fieldsat.runtime import FIELDS_FILE_VARIABLE, create_demo_server, create_live_server
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -24,6 +24,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.environ.get("STEMLINK_MCP_DEMO") == "1",
         help="Serve fixed demo numbers instead of calling Copernicus and Open-Meteo.",
     )
+    parser.add_argument(
+        "--fields",
+        metavar="PATH",
+        default=os.environ.get(FIELDS_FILE_VARIABLE) or None,
+        help="GeoJSON file of fields to serve instead of the built-in ones (live and demo).",
+    )
     return parser.parse_args(argv)
 
 
@@ -31,8 +37,12 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     # Logs go to stderr. With stdio, stdout carries the protocol and nothing else.
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s")
-    mcp = create_demo_server() if args.demo else create_live_server()
+    if args.demo:
+        mcp = create_demo_server(fields_file=args.fields)
+    else:
+        mcp = create_live_server(fields_file=args.fields)
     logging.info("data source: %s", "demo fixtures" if args.demo else "live providers")
+    logging.info("fields: %s", args.fields or "built-in registry")
 
     if args.transport == "stdio":
         mcp.run(transport="stdio", show_banner=False)

@@ -1,0 +1,149 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SL-PADDY-MINNERIYA",
+        "name": "Minneriya Paddy Fields",
+        "crop": "paddy",
+        "time_zone": "Asia/Colombo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.91,
+              8.05
+            ],
+            [
+              80.95,
+              8.05
+            ],
+            [
+              80.95,
+              8.02
+            ],
+            [
+              80.91,
+              8.02
+            ],
+            [
+              80.91,
+              8.05
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SL-PADDY-SAMMANTHURAI",
+        "name": "Sammanthurai Plains / Gal Oya Scheme",
+        "crop": "paddy",
+        "time_zone": "Asia/Colombo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              81.78,
+              7.4
+            ],
+            [
+              81.84,
+              7.4
+            ],
+            [
+              81.84,
+              7.34
+            ],
+            [
+              81.78,
+              7.34
+            ],
+            [
+              81.78,
+              7.4
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SL-PADDY-KALA-WEWA",
+        "name": "Mahaweli System H / Kala Wewa Basin",
+        "crop": "paddy",
+        "time_zone": "Asia/Colombo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.45,
+              8.04
+            ],
+            [
+              80.5,
+              8.04
+            ],
+            [
+              80.5,
+              7.99
+            ],
+            [
+              80.45,
+              7.99
+            ],
+            [
+              80.45,
+              8.04
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SL-TEA-PEDRO",
+        "name": "Pedro Tea Estate",
+        "crop": "tea",
+        "time_zone": "Asia/Colombo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.785,
+              6.975
+            ],
+            [
+              80.81,
+              6.975
+            ],
+            [
+              80.81,
+              6.955
+            ],
+            [
+              80.785,
+              6.955
+            ],
+            [
+              80.785,
+              6.975
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

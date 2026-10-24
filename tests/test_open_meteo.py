@@ -1,6 +1,7 @@
 """Live Open-Meteo provider contract tests with mocked HTTP responses."""
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -123,3 +124,33 @@ async def test_allows_missing_optional_humidity() -> None:
         result = await get_weather_context(registered_field(), 7, 3, provider)
 
     assert result.average_humidity_last_7_days is None
+
+
+@pytest.mark.asyncio
+async def test_auto_time_zone_uses_the_zone_open_meteo_names() -> None:
+    captured_request: httpx.Request | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(200, json={**weather_payload(), "timezone": "Asia/Colombo"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoWeatherProvider(client=client, clock=lambda: NOW)
+        field = replace(registered_field(), time_zone="auto")
+        result = await get_weather_context(field, 1, 1, provider)
+
+    assert captured_request is not None
+    assert captured_request.url.params["timezone"] == "auto"
+    assert result.rainfall_forecast_next_48_hours_mm == 48.0
+
+
+@pytest.mark.asyncio
+async def test_auto_time_zone_without_a_zone_in_the_response_is_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=weather_payload())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoWeatherProvider(client=client, clock=lambda: NOW)
+        with pytest.raises(SourceUnavailableError):
+            await provider.get_daily_context(replace(registered_field(), time_zone="auto"), 7, 3)

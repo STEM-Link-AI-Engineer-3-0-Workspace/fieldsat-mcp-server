@@ -1,5 +1,7 @@
 """Tool behaviour through a real MCP client connected in memory to the demo server."""
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -9,6 +11,7 @@ from fastmcp.exceptions import ToolError
 from fieldsat.runtime import create_demo_server
 
 mcp = create_demo_server()
+ROOT = Path(__file__).resolve().parents[1]
 
 SATELLITE_KEYS = [
     "field_id",
@@ -122,3 +125,19 @@ async def test_weather_failure_does_not_remove_satellite() -> None:
         "get_satellite_analysis", {"field_id": "SL-PADDY-WEATHER-FAIL", "comparison_days": 14}
     )
     assert satellite["ndvi_change_percentage"] == -15.2
+
+
+async def test_demo_fields_can_come_from_a_field_file(tmp_path: Path) -> None:
+    document = json.loads((ROOT / "fields.example.geojson").read_text())
+    document["features"] = document["features"][:1]
+    document["features"][0]["properties"].update(id="my-farm", name="My farm")
+    fields_file = tmp_path / "fields.geojson"
+    fields_file.write_text(json.dumps(document))
+
+    async with Client(create_demo_server(fields_file=fields_file)) as client:
+        listed = await client.call_tool("list_fields", {})
+    assert isinstance(listed.structured_content, dict)
+    ids = [field["id"] for field in listed.structured_content["fields"]]
+    assert ids[0] == "MY-FARM"
+    assert "SL-PADDY-MINNERIYA" not in ids
+    assert "SL-PADDY-SAT-FAIL" in ids

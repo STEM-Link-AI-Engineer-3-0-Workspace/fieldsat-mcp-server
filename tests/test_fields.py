@@ -1,6 +1,8 @@
 """Field registry tests."""
 
+import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -8,9 +10,13 @@ from fieldsat.domain.fields import (
     REGISTERED_FIELDS,
     find_registered_field,
     normalize_field_id,
+    parse_field_registry,
     validate_field_registry,
 )
 from fieldsat.domain.geometry import PolygonGeometry, centroid, polygon
+from fieldsat.runtime import load_fields
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_production_registry_contains_the_demo_field_and_four_agricultural_zones() -> None:
@@ -93,3 +99,45 @@ def test_rejects_duplicate_or_non_normalized_field_ids() -> None:
         validate_field_registry((replace(field, id="sl-paddy-04"),))
     with pytest.raises(ValueError, match="Duplicate"):
         validate_field_registry((field, replace(field)))
+
+
+def test_example_field_file_matches_the_built_in_registry() -> None:
+    assert load_fields(ROOT / "fields.example.geojson", {}) == REGISTERED_FIELDS
+    assert load_fields(None, {}) == REGISTERED_FIELDS
+    assert load_fields(None, {"FIELDSAT_FIELDS_FILE": str(ROOT / "fields.example.geojson")}) == (
+        REGISTERED_FIELDS
+    )
+
+
+def field_document(**properties: object) -> dict[str, object]:
+    with (ROOT / "fields.example.geojson").open() as file:
+        document: dict[str, object] = json.load(file)
+    features = document["features"]
+    assert isinstance(features, list)
+    features[0]["properties"].update(properties)
+    return document
+
+
+def test_field_file_ids_are_normalized_and_time_zone_is_any_iana_zone() -> None:
+    fields = parse_field_registry(field_document(id="my-farm", time_zone="Asia/Kolkata"))
+    assert fields[0].id == "MY-FARM"
+    assert fields[0].time_zone == "Asia/Kolkata"
+
+
+@pytest.mark.parametrize(
+    ("properties", "message"),
+    [
+        ({"crop": "rice"}, "crop"),
+        ({"time_zone": "Mars/Olympus"}, "IANA"),
+        ({"id": 7}, "strings"),
+        ({"id": "SL-TEA-PEDRO"}, "Duplicate"),
+    ],
+)
+def test_field_file_rejects_bad_properties(properties: dict[str, object], message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        parse_field_registry(field_document(**properties))
+
+
+def test_field_file_must_be_a_feature_collection() -> None:
+    with pytest.raises(ValueError, match="FeatureCollection"):
+        parse_field_registry({"type": "Feature"})

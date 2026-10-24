@@ -110,11 +110,17 @@ TEST_REGISTERED_FIELDS: tuple[RegisteredField, ...] = (
 )
 
 
+def demo_fields(fields: tuple[RegisteredField, ...]) -> tuple[RegisteredField, ...]:
+    """The given fields plus the verification fields whose IDs they do not already use."""
+    ids = {field.id for field in fields}
+    return (
+        *fields,
+        *(field for field in TEST_REGISTERED_FIELDS if field.id not in _PRODUCTION_IDS | ids),
+    )
+
+
 # Demo mode knows the four real zones plus the verification fields.
-DEMO_FIELDS: tuple[RegisteredField, ...] = (
-    *REGISTERED_FIELDS,
-    *(field for field in TEST_REGISTERED_FIELDS if field.id not in _PRODUCTION_IDS),
-)
+DEMO_FIELDS: tuple[RegisteredField, ...] = demo_fields(REGISTERED_FIELDS)
 
 
 def find_test_field(field_id: str) -> RegisteredField | None:

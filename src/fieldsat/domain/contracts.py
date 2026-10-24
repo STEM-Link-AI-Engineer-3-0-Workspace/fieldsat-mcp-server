@@ -38,3 +38,24 @@ class WeatherContext(StrictContract):
     average_humidity_last_7_days: float | None = None
     heavy_rain_recent: bool | None = None
     heavy_rain_expected: bool
+
+
+class LandCoverShare(StrictContract):
+    land_cover: str
+    percentage: float
+
+
+class AreaSearchResult(StrictContract):
+    field_id: str
+    place: str
+    crop: Literal["paddy", "tea"]
+    latitude: float
+    longitude: float
+    area_size_m: int
+    area_hectares: float
+    matching_land_cover_percentage: float
+    matching_land_cover_classes: list[str]
+    land_cover: list[LandCoverShare]
+    land_cover_source: str
+    candidates_checked: int
+    other_places: list[str]

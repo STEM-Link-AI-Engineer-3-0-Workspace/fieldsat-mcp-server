@@ -11,12 +11,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from fieldsat.domain.errors import SourceUnavailableError
-from fieldsat.domain.evidence import WeatherEvidence, WeatherHour
+from fieldsat.domain.evidence import Place, WeatherEvidence, WeatherHour
 from fieldsat.domain.fields import AUTO_TIME_ZONE, RegisteredField
 from fieldsat.domain.geometry import centroid
 from fieldsat.providers.http_retry import Jitter, Sleep, log_provider_event, request_with_retry
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+# Copernicus has no place-name search, so names are resolved with Open-Meteo's geocoder (GeoNames).
+OPEN_METEO_GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 
 def _utc_now() -> datetime:
@@ -208,3 +210,76 @@ class OpenMeteoWeatherProvider:
                 raise ValueError("Hourly relative humidity must be between 0 and 100.")
             result.append(WeatherHour(timestamp, rain, relative_humidity))
         return tuple(result)
+
+
+class OpenMeteoPlaceSearchProvider:
+    """Resolve a place name to coordinates and a time zone with the Open-Meteo geocoder."""
+
+    def __init__(
+        self,
+        *,
+        client: httpx.AsyncClient | None = None,
+        retry_sleep: Sleep = asyncio.sleep,
+        retry_jitter: Jitter = random.random,
+    ) -> None:
+        self._client = client
+        self._retry_sleep = retry_sleep
+        self._retry_jitter = retry_jitter
+
+    async def search_places(
+        self, name: str, country_code: str | None, count: int
+    ) -> tuple[Place, ...]:
+        correlation_id = uuid4().hex
+        params: dict[str, str | int] = {"name": name, "count": count, "format": "json"}
+        if country_code:
+            params["countryCode"] = country_code.upper()
+
+        async def operation() -> httpx.Response:
+            if self._client is not None:
+                return await self._client.get(OPEN_METEO_GEOCODING_URL, params=params)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                return await client.get(OPEN_METEO_GEOCODING_URL, params=params)
+
+        try:
+            response = await request_with_retry(
+                operation,
+                provider="open-meteo-geocoding",
+                correlation_id=correlation_id,
+                sleep=self._retry_sleep,
+                jitter=self._retry_jitter,
+            )
+            response.raise_for_status()
+            return self._parse_places(response.json())
+        except (httpx.HTTPError, ValueError, TypeError) as error:
+            raise SourceUnavailableError(
+                "place_search", "Open-Meteo did not return valid place search results."
+            ) from error
+
+    @staticmethod
+    def _parse_places(payload: object) -> tuple[Place, ...]:
+        root = _mapping(payload, "response")
+        # The geocoder leaves "results" out entirely when nothing matches.
+        results = root.get("results")
+        if results is None:
+            return ()
+        places: list[Place] = []
+        for index, value in enumerate(_sequence(results, "results")):
+            result = _mapping(value, f"results[{index}]")
+            name = result.get("name")
+            latitude = _number(result.get("latitude"), f"results[{index}].latitude")
+            longitude = _number(result.get("longitude"), f"results[{index}].longitude")
+            time_zone = result.get("timezone", AUTO_TIME_ZONE)
+            region, country = result.get("admin1"), result.get("country")
+            if not isinstance(name, str) or latitude is None or longitude is None:
+                raise ValueError(f"results[{index}] must have a name and coordinates.")
+            places.append(
+                Place(
+                    name=name,
+                    latitude=latitude,
+                    longitude=longitude,
+                    time_zone=time_zone if isinstance(time_zone, str) else AUTO_TIME_ZONE,
+                    region=region if isinstance(region, str) else None,
+                    country=country if isinstance(country, str) else None,
+                )
+            )
+        return tuple(places)

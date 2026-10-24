@@ -10,15 +10,18 @@ from datetime import datetime, time, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
+from fieldsat.domain.area_search import LAND_COVER_CLASSES
 from fieldsat.domain.errors import SourceUnavailableError
 from fieldsat.domain.evidence import (
+    LandCoverEvidence,
+    Place,
     SatelliteEvidence,
     SatellitePeriodEvidence,
     WeatherEvidence,
     WeatherHour,
 )
 from fieldsat.domain.fields import REGISTERED_FIELDS, RegisteredField, normalize_field_id
-from fieldsat.domain.geometry import polygon
+from fieldsat.domain.geometry import PolygonGeometry, centroid, polygon
 
 type FixtureProfile = Literal[
     "canonical",
@@ -248,5 +251,66 @@ class FixtureWeatherProvider:
         return CANONICAL_WEATHER
 
 
+def _land_cover(**percentages: float) -> LandCoverEvidence:
+    values = {name: value for value, name in LAND_COVER_CLASSES.items()}
+    return LandCoverEvidence(
+        source="land-cover-fixture",
+        map_year=2020,
+        class_fractions={values[name]: share / 100 for name, share in percentages.items()},
+        classified_pixel_percentage=99.0,
+    )
+
+
+# The demo gazetteer: each place comes with the land cover every square around it reports.
+# Colombo is mostly built-up, so searching it for paddy shows NO_MATCHING_LAND_COVER.
+_DEMO_PLACES: tuple[tuple[Place, LandCoverEvidence], ...] = (
+    (
+        Place(
+            "Minneriya", 8.04652, 80.90251, "Asia/Colombo", "North Central Province", "Sri Lanka"
+        ),
+        _land_cover(cropland=68, herbaceous_wetland=9, tree_cover=15, built_up=5, grassland=3),
+    ),
+    (
+        Place("Ampara", 7.29754, 81.68202, "Asia/Colombo", "Eastern Province", "Sri Lanka"),
+        _land_cover(cropland=74, tree_cover=10, built_up=9, permanent_water_bodies=7),
+    ),
+    (
+        Place("Nuwara Eliya", 6.97078, 80.78286, "Asia/Colombo", "Central Province", "Sri Lanka"),
+        _land_cover(tree_cover=48, shrubland=21, cropland=12, built_up=14, grassland=5),
+    ),
+    (
+        Place("Colombo", 6.93548, 79.84868, "Asia/Colombo", "Western Province", "Sri Lanka"),
+        _land_cover(built_up=82, tree_cover=10, permanent_water_bodies=8),
+    ),
+)
+
+
+class FixturePlaceSearchProvider:
+    async def search_places(
+        self, name: str, country_code: str | None, count: int
+    ) -> tuple[Place, ...]:
+        query = name.casefold()
+        matches = tuple(
+            place
+            for place, _land_cover in _DEMO_PLACES
+            if query in place.name.casefold() and country_code in (None, "", "LK", "lk")
+        )
+        return matches[:count]
+
+
+class FixtureLandCoverProvider:
+    async def get_land_cover(self, geometry: PolygonGeometry) -> LandCoverEvidence:
+        longitude, latitude = centroid(geometry)
+        _place, land_cover = min(
+            _DEMO_PLACES,
+            key=lambda entry: (
+                (entry[0].latitude - latitude) ** 2 + (entry[0].longitude - longitude) ** 2
+            ),
+        )
+        return land_cover
+
+
 FIXTURE_SATELLITE_PROVIDER = FixtureSatelliteProvider()
 FIXTURE_WEATHER_PROVIDER = FixtureWeatherProvider()
+FIXTURE_PLACE_SEARCH_PROVIDER = FixturePlaceSearchProvider()
+FIXTURE_LAND_COVER_PROVIDER = FixtureLandCoverProvider()

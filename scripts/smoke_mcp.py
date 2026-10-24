@@ -32,7 +32,12 @@ def wait_until_listening(port: int, timeout_seconds: float = 15.0) -> None:
 async def check(url: str, mode: str) -> None:
     async with Client(url, mode=mode) as client:  # type: ignore[arg-type]
         tools = [tool.name for tool in await client.list_tools()]
-        assert tools == ["list_fields", "get_satellite_analysis", "get_weather_context"], tools
+        assert tools == [
+            "list_fields",
+            "search_area",
+            "get_satellite_analysis",
+            "get_weather_context",
+        ], tools
         result = await client.call_tool(
             "get_satellite_analysis", {"field_id": "SL-PADDY-MINNERIYA", "comparison_days": 14}
         )

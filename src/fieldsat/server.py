@@ -3,6 +3,7 @@
 from fastmcp import FastMCP
 
 from fieldsat import __version__
+from fieldsat.domain.area_search import with_searched_areas
 from fieldsat.domain.fields import (
     REGISTERED_FIELDS,
     FieldLookup,
@@ -10,20 +11,33 @@ from fieldsat.domain.fields import (
     find_registered_field,
 )
 from fieldsat.prompts import register_prompts
-from fieldsat.providers.base import SatelliteEvidenceProvider, WeatherEvidenceProvider
+from fieldsat.providers.base import (
+    LandCoverProvider,
+    PlaceSearchProvider,
+    SatelliteEvidenceProvider,
+    WeatherEvidenceProvider,
+)
 from fieldsat.resources import register_resources
-from fieldsat.tools import register_field_tools, register_satellite_tools, register_weather_tools
+from fieldsat.tools import (
+    register_area_tools,
+    register_field_tools,
+    register_satellite_tools,
+    register_weather_tools,
+)
 
 INSTRUCTIONS = (
-    "Read-only field-level satellite and weather evidence for Sri Lankan agricultural fields. "
-    "Call list_fields to find a field ID. Measurements describe the field; they do not "
-    "diagnose a cause."
+    "Read-only field-level satellite and weather evidence for agricultural fields. "
+    "Call list_fields to find a registered field ID. For any other place, call search_area "
+    "with the place name and crop, and use the area ID it returns. Measurements describe "
+    "the field; they do not diagnose a cause."
 )
 
 
 def create_server(
     satellite_provider: SatelliteEvidenceProvider,
     weather_provider: WeatherEvidenceProvider,
+    place_provider: PlaceSearchProvider,
+    land_cover_provider: LandCoverProvider,
     fields: tuple[RegisteredField, ...] = REGISTERED_FIELDS,
     find_field: FieldLookup = find_registered_field,
 ) -> FastMCP:
@@ -35,7 +49,10 @@ def create_server(
         # ToolError messages are always sent in full.
         mask_error_details=True,
     )
+    # Searched-area IDs describe their own square, so every tool can look them up.
+    find_field = with_searched_areas(find_field)
     register_field_tools(mcp, fields)
+    register_area_tools(mcp, place_provider, land_cover_provider)
     register_satellite_tools(mcp, satellite_provider, find_field)
     register_weather_tools(mcp, weather_provider, find_field)
     register_resources(mcp, fields, find_field)

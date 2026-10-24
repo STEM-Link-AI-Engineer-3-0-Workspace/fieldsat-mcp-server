@@ -127,6 +127,27 @@ async def test_weather_failure_does_not_remove_satellite() -> None:
     assert satellite["ndvi_change_percentage"] == -15.2
 
 
+async def test_search_area_returns_an_id_the_other_tools_accept() -> None:
+    area = await call("search_area", {"place_name": "minneriya", "crop": "paddy"})
+    assert area["field_id"].startswith("AREA_PADDY_8.04652_80.90251_1000M")
+    assert area["matching_land_cover_percentage"] == 77.0
+    assert area["candidates_checked"] == 9
+
+    satellite = await call(
+        "get_satellite_analysis", {"field_id": area["field_id"], "comparison_days": 14}
+    )
+    weather = await call("get_weather_context", {"field_id": area["field_id"]})
+    assert satellite["field_id"] == area["field_id"]
+    assert weather["heavy_rain_expected"] is True
+
+
+async def test_search_area_reports_places_it_cannot_use() -> None:
+    with pytest.raises(ToolError, match="NO_MATCHING_LAND_COVER"):
+        await call("search_area", {"place_name": "Colombo", "crop": "paddy"})
+    with pytest.raises(ToolError, match="PLACE_NOT_FOUND"):
+        await call("search_area", {"place_name": "Atlantis", "crop": "tea"})
+
+
 async def test_demo_fields_can_come_from_a_field_file(tmp_path: Path) -> None:
     document = json.loads((ROOT / "fields.example.geojson").read_text())
     document["features"] = document["features"][:1]

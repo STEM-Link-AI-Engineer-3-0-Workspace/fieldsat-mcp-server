@@ -123,3 +123,17 @@ def point_in_ring(point: Coordinate, ring: LinearRing) -> bool:
             if longitude < crossing_longitude:
                 inside = not inside
     return inside
+
+
+METRES_PER_DEGREE_LATITUDE = 111_320.0
+
+
+def square_around(longitude: float, latitude: float, size_m: float) -> PolygonGeometry:
+    """A square of side `size_m` metres centred on a point, as a counter-clockwise polygon."""
+    if size_m <= 0:
+        raise ValueError("size_m must be positive.")
+    half_latitude = size_m / 2 / METRES_PER_DEGREE_LATITUDE
+    half_longitude = size_m / 2 / (METRES_PER_DEGREE_LATITUDE * math.cos(math.radians(latitude)))
+    west, east = longitude - half_longitude, longitude + half_longitude
+    south, north = latitude - half_latitude, latitude + half_latitude
+    return polygon((west, south), (east, south), (east, north), (west, north), (west, south))

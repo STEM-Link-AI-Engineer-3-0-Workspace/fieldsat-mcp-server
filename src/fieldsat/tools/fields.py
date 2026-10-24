@@ -27,6 +27,7 @@ def register_field_tools(mcp: FastMCP, fields: tuple[RegisteredField, ...]) -> N
         """List every agricultural field this server can analyse, with its ID, name and crop.
 
         Call this first when the user names a place (such as Minneriya) instead of a field ID.
+        If no listed field matches the place, call search_area with the place name and crop.
         """
         return FieldList(
             fields=[FieldSummary(id=field.id, name=field.name, crop=field.crop) for field in fields]

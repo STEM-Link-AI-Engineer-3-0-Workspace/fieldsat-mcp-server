@@ -20,6 +20,7 @@ async def test_live_server_exposes_the_same_tools() -> None:
     mcp = create_live_server(LIVE_ENVIRONMENT)
     assert [tool.name for tool in await mcp.list_tools()] == [
         "list_fields",
+        "search_area",
         "get_satellite_analysis",
         "get_weather_context",
     ]

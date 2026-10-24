@@ -10,10 +10,13 @@ import httpx
 import pytest
 
 from fieldsat.domain.errors import SourceUnavailableError
+from fieldsat.domain.evidence import Place
 from fieldsat.domain.fields import RegisteredField, find_registered_field
 from fieldsat.domain.weather import get_weather_context
 from fieldsat.providers.open_meteo import (
     OPEN_METEO_FORECAST_URL,
+    OPEN_METEO_GEOCODING_URL,
+    OpenMeteoPlaceSearchProvider,
     OpenMeteoWeatherProvider,
 )
 
@@ -154,3 +157,64 @@ async def test_auto_time_zone_without_a_zone_in_the_response_is_unavailable() ->
         provider = OpenMeteoWeatherProvider(client=client, clock=lambda: NOW)
         with pytest.raises(SourceUnavailableError):
             await provider.get_daily_context(replace(registered_field(), time_zone="auto"), 7, 3)
+
+
+@pytest.mark.asyncio
+async def test_place_search_parses_geocoder_results() -> None:
+    captured_request: httpx.Request | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "name": "Minneriya",
+                        "latitude": 8.04652,
+                        "longitude": 80.90251,
+                        "timezone": "Asia/Colombo",
+                        "country": "Sri Lanka",
+                        "admin1": "North Central Province",
+                    }
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        places = await OpenMeteoPlaceSearchProvider(client=client).search_places(
+            "Minneriya", "lk", 5
+        )
+
+    assert places == (
+        Place(
+            "Minneriya", 8.04652, 80.90251, "Asia/Colombo", "North Central Province", "Sri Lanka"
+        ),
+    )
+    assert captured_request is not None
+    assert str(captured_request.url).startswith(OPEN_METEO_GEOCODING_URL)
+    assert captured_request.url.params["countryCode"] == "LK"
+    assert captured_request.url.params["count"] == "5"
+
+
+@pytest.mark.asyncio
+async def test_place_search_without_results_is_empty() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"generationtime_ms": 0.1})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoPlaceSearchProvider(client=client)
+        assert await provider.search_places("zzzqqq", None, 5) == ()
+
+
+@pytest.mark.asyncio
+async def test_place_search_errors_are_reported_as_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": True})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenMeteoPlaceSearchProvider(client=client)
+        with pytest.raises(SourceUnavailableError) as error:
+            await provider.search_places("Minneriya", None, 5)
+    assert error.value.source == "place_search"

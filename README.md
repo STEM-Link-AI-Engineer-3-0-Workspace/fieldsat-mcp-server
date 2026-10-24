@@ -5,6 +5,7 @@ Field-level evidence for AgriVibe, served over MCP with [FastMCP](https://gofast
 | Kind | Name | What it gives |
 |---|---|---|
 | tool | `list_fields` | The fields this server knows: ID, name, crop |
+| tool | `search_area` | Finds a square near a named place whose Copernicus land cover matches the crop |
 | tool | `get_satellite_analysis` | Sentinel-2 NDVI change, uniformity and data quality |
 | tool | `get_weather_context` | Last 7 days of rain and humidity, next 48 hours of rain |
 | resource | `fields://registry` | The field registry as JSON |
@@ -54,13 +55,30 @@ The MCP Python SDK diverts `print()` to stderr once the server is running, but o
 printed before that, or by a child process, lands in the protocol stream, and many
 clients drop a server that writes non-JSON to stdout.
 
-## Fields: built in or from a file
+## Fields: built in, from a file, or searched
 
-By default both modes serve the four built-in fields. To serve your own,
+**Registered fields.** By default both modes serve the four built-in fields. To serve your own,
 write a GeoJSON FeatureCollection like [`fields.example.geojson`](fields.example.geojson) and
 pass it with `--fields my-fields.geojson` or `FIELDSAT_FIELDS_FILE=my-fields.geojson`. Each
 feature is a Polygon with `id`, `name`, `crop` (`paddy` or `tea`) and an optional `time_zone`
 (an IANA name; default `auto`, which takes the zone from the field's location).
+
+**Searched areas.** `search_area(place_name, crop, area_size_m=1000, country_code="LK")`
+finds an area without registering it:
+
+1. Open-Meteo's geocoder turns the place name into coordinates. Copernicus has no place-name
+   search.
+2. The server checks the square centred on the place and the eight squares around it on the
+   [Copernicus Global Land Cover Map at 10 m](https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/clms/land-cover-and-land-use-mapping/global-dynamic-land-cover/lcm_global_10m_yearly_v1.html)
+   (CLMS LCM10, 2020), using the same Statistical API and credentials as Sentinel-2.
+3. It returns the square with the most matching land cover, which must be at least 40%.
+   Paddy matches cropland or herbaceous wetland. Tea matches tree cover, shrubland or
+   cropland, because the map has no plantation class.
+
+The result's `field_id`, for example `AREA_PADDY_8.04652_80.90251_1000M`, encodes the crop,
+centre and size. `get_satellite_analysis` and `get_weather_context` accept it like a
+registered ID, and nothing is stored on the server, so it also works with stateless HTTP
+hosting. The land-cover map shows where cropland is, not which crop is grown.
 
 ## Demo mode
 
@@ -75,12 +93,17 @@ four verification fields that misbehave on purpose:
 | `SL-PADDY-SLOW` | Satellite tool takes 20 seconds |
 
 With `--fields`, demo mode serves your fields with canonical numbers, plus these four.
+`search_area` in demo mode knows Minneriya, Ampara and Nuwara Eliya. It also knows Colombo,
+which is mostly built-up, so a paddy search there shows `NO_MATCHING_LAND_COVER`.
 
 ## Live data
 
 The live server refuses to start without `COPERNICUS_CLIENT_ID` and
 `COPERNICUS_CLIENT_SECRET`. Open-Meteo needs no key. Confirm you are allowed to process
 each registered field boundary before you use live data.
+
+Each `search_area` call makes nine small land-cover requests to Copernicus, which count
+against your account's processing-unit quota.
 
 ## Hosting
 

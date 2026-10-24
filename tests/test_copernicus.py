@@ -13,6 +13,8 @@ from fieldsat.domain.fields import RegisteredField, find_registered_field
 from fieldsat.providers.copernicus import (
     COPERNICUS_STATISTICS_URL,
     COPERNICUS_TOKEN_URL,
+    LAND_COVER_COLLECTION,
+    LAND_COVER_EVALSCRIPT,
     SENTINEL_2_EVALSCRIPT,
     SENTINEL_2_RESOLUTION_DEGREES,
     CopernicusCredentials,
@@ -263,3 +265,77 @@ async def test_parses_nan_string_statistics_for_fully_masked_days() -> None:
 
     assert result.valid_observations == 27
     assert result.periods_comparable is True
+
+
+def land_cover_payload(shares: dict[int, float], *, valid: int = 90) -> dict[str, Any]:
+    values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+    return {
+        "data": [
+            {
+                "interval": {"from": "2020-01-01T00:00:00Z", "to": "2021-01-01T00:00:00Z"},
+                "outputs": {
+                    "land_cover": {
+                        "bands": {
+                            f"B{index}": {
+                                "stats": {
+                                    "mean": shares.get(value, 0.0),
+                                    "stDev": 0.0,
+                                    "sampleCount": 100,
+                                    "noDataCount": 100 - valid,
+                                }
+                            }
+                            for index, value in enumerate(values)
+                        }
+                    }
+                },
+            }
+        ],
+        "status": "OK",
+    }
+
+
+@pytest.mark.asyncio
+async def test_land_cover_requests_the_lcm10_collection_and_reads_class_shares() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == COPERNICUS_TOKEN_URL:
+            return httpx.Response(200, json={"access_token": "access-token", "expires_in": 600})
+        requests.append(request)
+        return httpx.Response(200, json=land_cover_payload({40: 0.7, 90: 0.3}))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = CopernicusSatelliteProvider(
+            CopernicusCredentials("client-id", "client-secret"), client=client
+        )
+        result = await provider.get_land_cover(registered_field().geometry)
+
+    assert result.class_fractions[40] == pytest.approx(0.7)
+    assert result.class_fractions[90] == pytest.approx(0.3)
+    assert result.class_fractions[10] == 0.0
+    assert result.classified_pixel_percentage == pytest.approx(90.0)
+    assert result.map_year == 2020
+    request_payload = json.loads(requests[0].content)
+    assert request_payload["input"]["data"] == [{"type": LAND_COVER_COLLECTION}]
+    assert request_payload["aggregation"]["timeRange"] == {
+        "from": "2020-01-01T00:00:00Z",
+        "to": "2021-01-01T00:00:00Z",
+    }
+    assert request_payload["aggregation"]["evalscript"] == LAND_COVER_EVALSCRIPT
+    assert 'bands: ["LCM10", "dataMask"]' in LAND_COVER_EVALSCRIPT
+
+
+@pytest.mark.asyncio
+async def test_land_cover_failures_are_reported_as_land_cover_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == COPERNICUS_TOKEN_URL:
+            return httpx.Response(200, json={"access_token": "access-token", "expires_in": 600})
+        return httpx.Response(200, json={"data": [], "status": "OK"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = CopernicusSatelliteProvider(
+            CopernicusCredentials("client-id", "client-secret"), client=client
+        )
+        with pytest.raises(SourceUnavailableError) as error:
+            await provider.get_land_cover(registered_field().geometry)
+    assert error.value.source == "land_cover"

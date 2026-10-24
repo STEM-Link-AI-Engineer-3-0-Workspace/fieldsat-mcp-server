@@ -34,3 +34,22 @@ class WeatherEvidence:
     as_of: datetime
     history: tuple[WeatherHour, ...]
     forecast: tuple[WeatherHour, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Place:
+    name: str
+    latitude: float
+    longitude: float
+    time_zone: str
+    region: str | None
+    country: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LandCoverEvidence:
+    source: str
+    map_year: int
+    # Share of classified pixels per land-cover class value, between zero and one.
+    class_fractions: dict[int, float]
+    classified_pixel_percentage: float

@@ -22,6 +22,9 @@ FieldId = Annotated[
     Field(
         min_length=1,
         max_length=64,
-        description="Registered STEM Link field identifier, for example SL-PADDY-MINNERIYA",
+        description=(
+            "Field ID from list_fields, for example SL-PADDY-MINNERIYA, "
+            "or an area ID from search_area"
+        ),
     ),
 ]

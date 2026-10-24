@@ -7,7 +7,7 @@ from fieldsat.runtime import create_demo_server
 mcp = create_demo_server()
 
 
-async def test_server_advertises_three_tools_one_resource_one_template_one_prompt() -> None:
+async def test_server_advertises_four_tools_one_resource_one_template_one_prompt() -> None:
     async with Client(mcp) as client:
         tools = await client.list_tools()
         resources = await client.list_resources()
@@ -15,6 +15,7 @@ async def test_server_advertises_three_tools_one_resource_one_template_one_promp
         prompts = await client.list_prompts()
     assert [tool.name for tool in tools] == [
         "list_fields",
+        "search_area",
         "get_satellite_analysis",
         "get_weather_context",
     ]

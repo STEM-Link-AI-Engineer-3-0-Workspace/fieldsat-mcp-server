@@ -12,9 +12,11 @@ from uuid import uuid4
 
 import httpx
 
+from fieldsat.domain.area_search import LAND_COVER_CLASSES
 from fieldsat.domain.errors import SourceUnavailableError
-from fieldsat.domain.evidence import SatelliteEvidence, SatellitePeriodEvidence
+from fieldsat.domain.evidence import LandCoverEvidence, SatelliteEvidence, SatellitePeriodEvidence
 from fieldsat.domain.fields import RegisteredField
+from fieldsat.domain.geometry import PolygonGeometry
 from fieldsat.providers.http_retry import Jitter, Sleep, log_provider_event, request_with_retry
 
 COPERNICUS_TOKEN_URL = (
@@ -52,6 +54,42 @@ function evaluatePixel(samples) {
     dataMask: [validNdvi ? 1 : 0, samples.dataMask]
   };
 }
+"""
+
+# Copernicus Global Land Cover Map at 10 m, Annual V1 (CLMS LCM10), served on the same
+# Sentinel Hub deployment as Sentinel-2. Collection ID from the CDSE data documentation:
+# https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/clms/land-cover-and-land-use-mapping/global-dynamic-land-cover/lcm_global_10m_yearly_v1.html
+LAND_COVER_COLLECTION = "byoc-828f6b20-8ffd-48f8-a1da-fefd271456db"
+LAND_COVER_SOURCE = "Copernicus Global Land Cover Map 10 m (CLMS LCM10)"
+# The 2020 base year. The interval covers the whole year, so one statistics record comes back.
+LAND_COVER_YEAR = 2020
+LAND_COVER_TIME_RANGE = {"from": "2020-01-01T00:00:00Z", "to": "2021-01-01T00:00:00Z"}
+LAND_COVER_INTERVAL = "P366D"
+LAND_COVER_CLASS_VALUES: tuple[int, ...] = tuple(LAND_COVER_CLASSES)
+
+# One output band per class: 1 where the pixel has that class. The mean of band Bn over the
+# area is then the share of classified pixels in class n. 254 (unclassifiable) and 255
+# (no data) are masked out, so they never count towards a class.
+LAND_COVER_EVALSCRIPT = f"""//VERSION=3
+const CLASSES = {list(LAND_COVER_CLASS_VALUES)};
+
+function setup() {{
+  return {{
+    input: [{{ bands: ["LCM10", "dataMask"] }}],
+    output: [
+      {{ id: "land_cover", bands: CLASSES.length, sampleType: "UINT8" }},
+      {{ id: "dataMask", bands: 1 }}
+    ]
+  }};
+}}
+
+function evaluatePixel(samples) {{
+  const classified = samples.dataMask === 1 && CLASSES.includes(samples.LCM10);
+  return {{
+    land_cover: CLASSES.map((value) => (samples.LCM10 === value ? 1 : 0)),
+    dataMask: [classified ? 1 : 0]
+  }};
+}}
 """
 
 
@@ -317,6 +355,29 @@ class CopernicusSatelliteProvider:
         )
         return evidence
 
+    async def get_land_cover(self, geometry: PolygonGeometry) -> LandCoverEvidence:
+        """Share of each land-cover class inside a polygon, from the 2020 LCM10 map."""
+        correlation_id = uuid4().hex
+        started_at = self._monotonic()
+        request_payload = self._land_cover_payload(geometry)
+        try:
+            access_token = await self._access_token(correlation_id)
+            response = await self._post_statistics(access_token, request_payload, correlation_id)
+            response.raise_for_status()
+            evidence = self._parse_land_cover(response.json())
+        except (httpx.HTTPError, ValueError, TypeError) as error:
+            raise SourceUnavailableError(
+                "land_cover", "Copernicus did not return valid land-cover statistics."
+            ) from error
+        log_provider_event(
+            "provider_request_complete",
+            provider="copernicus-land-cover",
+            correlation_id=correlation_id,
+            status_class="2xx",
+            duration_ms=round((self._monotonic() - started_at) * 1000),
+        )
+        return evidence
+
     @staticmethod
     def _request_payload(
         field: RegisteredField, starts_at: datetime, ends_at: datetime
@@ -349,6 +410,58 @@ class CopernicusSatelliteProvider:
                 "resy": SENTINEL_2_RESOLUTION_DEGREES,
             },
         }
+
+    @staticmethod
+    def _land_cover_payload(geometry: PolygonGeometry) -> Mapping[str, object]:
+        coordinates = [
+            [[longitude, latitude] for longitude, latitude in ring] for ring in geometry.coordinates
+        ]
+        return {
+            "input": {
+                "bounds": {
+                    "geometry": {"type": "Polygon", "coordinates": coordinates},
+                    "properties": {"crs": WGS84_URI},
+                },
+                "data": [{"type": LAND_COVER_COLLECTION}],
+            },
+            "aggregation": {
+                "timeRange": LAND_COVER_TIME_RANGE,
+                "aggregationInterval": {"of": LAND_COVER_INTERVAL},
+                "evalscript": LAND_COVER_EVALSCRIPT,
+                "resx": SENTINEL_2_RESOLUTION_DEGREES,
+                "resy": SENTINEL_2_RESOLUTION_DEGREES,
+            },
+        }
+
+    @staticmethod
+    def _parse_land_cover(payload: object) -> LandCoverEvidence:
+        root = _mapping(payload, "statistics response")
+        records = _sequence(root.get("data"), "data")
+        if not records:
+            raise ValueError("The land-cover response has no records.")
+        record = _mapping(records[0], "data[0]")
+        outputs = _mapping(record.get("outputs"), "data[0].outputs")
+        output = _mapping(outputs.get("land_cover"), "data[0].outputs.land_cover")
+        bands = _mapping(output.get("bands"), "data[0].outputs.land_cover.bands")
+        fractions: dict[int, float] = {}
+        sample_count = no_data_count = 0
+        for index, value in enumerate(LAND_COVER_CLASS_VALUES):
+            label = f"data[0].outputs.land_cover.bands.B{index}"
+            stats = _mapping(_mapping(bands.get(f"B{index}"), label).get("stats"), f"{label}.stats")
+            sample_count = _integer(stats.get("sampleCount"), f"{label}.stats.sampleCount")
+            no_data_count = _integer(stats.get("noDataCount"), f"{label}.stats.noDataCount")
+            mean = _number(stats.get("mean"), f"{label}.stats.mean", optional=True)
+            if mean is not None and not 0 <= mean <= 1:
+                raise ValueError("Land-cover class shares must be between zero and one.")
+            fractions[value] = mean or 0.0
+        if sample_count <= 0 or no_data_count > sample_count:
+            raise ValueError("The land-cover response has no pixels for the area.")
+        return LandCoverEvidence(
+            source=LAND_COVER_SOURCE,
+            map_year=LAND_COVER_YEAR,
+            class_fractions=fractions,
+            classified_pixel_percentage=100 * (sample_count - no_data_count) / sample_count,
+        )
 
     @classmethod
     def _parse_response(cls, payload: object) -> tuple[_DailyStats, ...]:

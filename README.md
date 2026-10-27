@@ -48,8 +48,11 @@ uv sync
 uv run fieldsat --demo                              # stdio
 uv run fieldsat --demo --transport http --port 8000 # http://127.0.0.1:8000/mcp
 cp .env.example .env   # then add your Copernicus client ID and secret
-uv run --env-file .env fieldsat --transport http    # live
+uv run fieldsat --transport http                    # live
 ```
+
+`fieldsat` and the ASGI app read `.env` from the working directory. Variables already set in
+the environment (from `uv run --env-file`, your shell, or a hosting platform) take precedence.
 
 With stdio, stdout is the protocol channel. Log to stderr (`logging` does by default).
 The MCP Python SDK diverts `print()` to stderr once the server is running, but output
@@ -77,7 +80,7 @@ each registered field boundary before you use live data.
 ## Hosting
 
 `app.py` exports the live ASGI app for platforms that look for it (Vercel, for example).
-Locally: `uv run --env-file .env uvicorn fieldsat.asgi:app --port 8000`.
+Locally: `uv run uvicorn fieldsat.asgi:app --port 8000`.
 
 ## Checks
 

@@ -15,9 +15,19 @@ from fieldsat.resources import register_resources
 from fieldsat.tools import register_field_tools, register_satellite_tools, register_weather_tools
 
 INSTRUCTIONS = (
-    "Read-only field-level satellite and weather evidence for Sri Lankan agricultural fields. "
-    "Call list_fields to find a field ID. Measurements describe the field; they do not "
-    "diagnose a cause."
+    "Read-only satellite and weather evidence for registered agricultural fields in Sri Lanka.\n"
+    "Workflow:\n"
+    "1. Call list_fields to get field IDs. Do not guess an ID; map a place or crop the user "
+    "mentions to a listed field.\n"
+    "2. Call get_satellite_analysis for vegetation change and get_weather_context for "
+    "rainfall. They are independent and can run in parallel.\n"
+    "3. Check data_quality before you use the satellite numbers. If it is poor, say the reading "
+    "is unreliable.\n"
+    "The tools return measurements, not diagnoses. Do not name a cause such as pests, disease "
+    "or drought from these values alone.\n"
+    "Errors start with a code. FIELD_NOT_REGISTERED: call list_fields and retry with a listed "
+    "ID. SATELLITE_SOURCE_UNAVAILABLE or WEATHER_SOURCE_UNAVAILABLE: report that the source is "
+    "unavailable. Do not invent values."
 )
 
 

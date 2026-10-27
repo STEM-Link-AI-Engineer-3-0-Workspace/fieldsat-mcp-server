@@ -24,9 +24,12 @@ def register_field_tools(mcp: FastMCP, fields: tuple[RegisteredField, ...]) -> N
         annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
     )
     def list_fields() -> FieldList:
-        """List every agricultural field this server can analyse, with its ID, name and crop.
+        """List every field this server can analyse, with its ID, name and crop.
 
-        Call this first when the user names a place (such as Minneriya) instead of a field ID.
+        Call this first. The other tools only accept an ID from this list, so use it to turn
+        a place or crop the user mentions (such as "the Minneriya paddy") into a field ID.
+        Takes no arguments, makes no network calls and returns the same list every time.
+        If no field matches what the user asked about, say the field is not registered.
         """
         return FieldList(
             fields=[FieldSummary(id=field.id, name=field.name, crop=field.crop) for field in fields]

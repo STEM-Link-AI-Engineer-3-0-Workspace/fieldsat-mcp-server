@@ -34,15 +34,30 @@ def register_satellite_tools(
             Field(
                 ge=1,
                 le=90,
-                description="Length of each current and previous comparison period in days",
+                description=(
+                    "Days in each comparison period. The current period is the last N days and "
+                    "the previous period is the N days before it. Use 14 unless the user asks "
+                    "for a different window. Short windows often have too few cloud-free images."
+                ),
             ),
         ],
     ) -> SatelliteContext:
         """Sentinel-2 vegetation change (NDVI) and data quality for one registered field.
 
-        Compares the last `comparison_days` with the period before it and returns NDVI change,
-        spatial variability, observation count, cloud coverage and a data-quality grade.
-        The measurements do not diagnose a cause.
+        Requires a field_id from list_fields. Compares mean NDVI over the last
+        `comparison_days` with the same number of days before that.
+
+        Returns:
+        - trend: change in mean NDVI. stable is within ±5%, moderate is 5-15%, significant
+          is more than 15%.
+        - field_uniformity: uniform, moderately_variable or uneven, from how much NDVI
+          varies across the field.
+        - data_quality: good, moderate or poor, from the number of cloud-free observations,
+          cloud cover and usable pixels. If it is poor, the trend is unreliable. Say so first,
+          or try a longer comparison_days.
+
+        These are measurements, not a diagnosis. A decline does not show a cause.
+        Pair this with get_weather_context for rainfall.
         """
         field = find_field(field_id)
         if field is None:

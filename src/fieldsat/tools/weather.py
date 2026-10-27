@@ -35,7 +35,8 @@ def register_weather_tools(
                 ge=1,
                 le=30,
                 description=(
-                    "Requested historical provider window; output always covers the last 7 days"
+                    "Days of history fetched from the provider. Leave this at the default. "
+                    "The output always covers the last 7 days."
                 ),
             ),
         ] = 7,
@@ -45,15 +46,25 @@ def register_weather_tools(
                 ge=1,
                 le=7,
                 description=(
-                    "Requested forecast provider window; output always covers the next 48 hours"
+                    "Days of forecast fetched from the provider. Leave this at the default. "
+                    "The output always covers the next 48 hours."
                 ),
             ),
         ] = 2,
     ) -> WeatherContext:
         """Recent rainfall and humidity, and the 48-hour rain forecast, for one registered field.
 
-        Values are provider estimates, not on-field gauge readings. Use them for weather context
-        and the timing of field work, not for diagnosis.
+        Requires a field_id from list_fields. Usually only field_id is needed.
+
+        Returns rainfall totals in mm for the last 7 days, the last 48 hours and the next
+        48 hours, along with rainy days and average humidity (%) over the last 7 days.
+        heavy_rain_recent means at least 30 mm in the last 48 hours or at least 75 mm in
+        7 days. heavy_rain_expected means at least 30 mm is forecast for the next 48 hours.
+        A null value means the provider had no data for it.
+
+        The values are model estimates, not on-field gauge readings. Use them for weather
+        context and to time field work, not to diagnose a cause. Pair this with
+        get_satellite_analysis for vegetation change.
         """
         field = find_field(field_id)
         if field is None:

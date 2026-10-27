@@ -10,7 +10,10 @@ class SourceUnavailableError(RuntimeError):
 
 
 def field_not_registered_message(field_id: str) -> str:
-    return f'FIELD_NOT_REGISTERED: Field "{field_id}" is not registered (404). Check the field ID.'
+    return (
+        f'FIELD_NOT_REGISTERED: Field "{field_id}" is not registered (404). '
+        "Call list_fields and retry with one of the listed IDs."
+    )
 
 
 def source_unavailable_message(error: SourceUnavailableError) -> str:
@@ -20,4 +23,8 @@ def source_unavailable_message(error: SourceUnavailableError) -> str:
         if error.source == "satellite"
         else "WEATHER_SOURCE_UNAVAILABLE"
     )
-    return f"{code}: {label} source unavailable (503): {error}"
+    return (
+        f"{code}: {label} source unavailable (503): {str(error).rstrip('.')}. "
+        "Retrying immediately is unlikely to help. Report that this evidence is unavailable "
+        "and do not estimate the values."
+    )

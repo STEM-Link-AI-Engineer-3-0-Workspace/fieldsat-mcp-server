@@ -11,5 +11,16 @@ def test_live_server_requires_provider_credentials() -> None:
         create_live_server({})
 
 
+async def test_live_server_exposes_the_same_tools() -> None:
+    mcp = create_live_server(
+        {"COPERNICUS_CLIENT_ID": "client-id", "COPERNICUS_CLIENT_SECRET": "client-secret"}
+    )
+    assert [tool.name for tool in await mcp.list_tools()] == [
+        "list_fields",
+        "get_satellite_analysis",
+        "get_weather_context",
+    ]
+
+
 def test_cli_demo_flag() -> None:
     assert parse_args(["--demo"]).demo is True

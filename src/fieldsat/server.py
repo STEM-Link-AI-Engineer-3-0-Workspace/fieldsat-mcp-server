@@ -9,7 +9,9 @@ from fieldsat.domain.fields import (
     RegisteredField,
     find_registered_field,
 )
+from fieldsat.prompts import register_prompts
 from fieldsat.providers.base import SatelliteEvidenceProvider, WeatherEvidenceProvider
+from fieldsat.resources import register_resources
 from fieldsat.tools import register_field_tools, register_satellite_tools, register_weather_tools
 
 INSTRUCTIONS = (
@@ -33,4 +35,6 @@ def create_server(
     register_field_tools(mcp, fields)
     register_satellite_tools(mcp, satellite_provider, find_field)
     register_weather_tools(mcp, weather_provider, find_field)
+    register_resources(mcp, fields, find_field)
+    register_prompts(mcp)
     return mcp

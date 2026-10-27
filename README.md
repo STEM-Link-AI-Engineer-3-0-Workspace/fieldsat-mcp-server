@@ -1,5 +1,7 @@
 # STEM Link Satellite MCP (server)
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/stem-link-ai-engineer-3-0-workspace-fieldsat-mcp-server-741o2u?v=f707d15f1e4928e735da965a4c050f31)](https://m8ven.ai/mcp/stem-link-ai-engineer-3-0-workspace-fieldsat-mcp-server-741o2u?s=readme)
+
 Field-level evidence for AgriVibe, served over MCP with [FastMCP](https://gofastmcp.com):
 
 | Kind | Name | What it gives |

@@ -10,7 +10,7 @@ from fieldsat.domain.fields import (
     find_registered_field,
 )
 from fieldsat.providers.base import SatelliteEvidenceProvider, WeatherEvidenceProvider
-from fieldsat.tools import register_field_tools
+from fieldsat.tools import register_field_tools, register_satellite_tools, register_weather_tools
 
 INSTRUCTIONS = (
     "Read-only field-level satellite and weather evidence for Sri Lankan agricultural fields. "
@@ -31,4 +31,6 @@ def create_server(
         version=__version__,
     )
     register_field_tools(mcp, fields)
+    register_satellite_tools(mcp, satellite_provider, find_field)
+    register_weather_tools(mcp, weather_provider, find_field)
     return mcp

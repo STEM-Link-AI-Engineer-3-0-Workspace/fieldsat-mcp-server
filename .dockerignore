@@ -1,0 +1,11 @@
+# Secrets and local state never enter the build context.
+.env
+.env.*
+.venv
+.git
+.idea
+__pycache__
+*.pyc
+tests
+samples
+try_agent.py

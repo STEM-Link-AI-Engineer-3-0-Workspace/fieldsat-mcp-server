@@ -4,7 +4,7 @@ name: Deploy
 # and rolls the ECS service onto it. Run it by hand from the Actions tab with "Run workflow".
 on:
   push:
-    branches: [main, lesson2-cicd] # lesson2-cicd: temporary, for the rehearsal run only
+    branches: [main]
   workflow_dispatch:
 
 # One deploy at a time per repository; a newer push waits rather than racing.

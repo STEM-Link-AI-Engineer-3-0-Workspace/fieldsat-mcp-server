@@ -28,6 +28,7 @@ class SatelliteContext(StrictContract):
     valid_observations: int
     average_cloud_coverage_percentage: float
     data_quality: Literal["good", "moderate", "poor"]
+    provider_notes: str | None = None
 
 
 class WeatherContext(StrictContract):

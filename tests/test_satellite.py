@@ -37,6 +37,7 @@ async def test_canonical_webinar_evidence() -> None:
         "valid_observations": 4,
         "average_cloud_coverage_percentage": 11.0,
         "data_quality": "good",
+        "provider_notes": None,
     }
 
 

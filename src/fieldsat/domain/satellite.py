@@ -89,4 +89,5 @@ async def get_satellite_analysis(
         valid_observations=evidence.valid_observations,
         average_cloud_coverage_percentage=evidence.average_cloud_coverage_percentage,
         data_quality=classify_data_quality(evidence),
+        provider_notes=evidence.provider_notes,
     )

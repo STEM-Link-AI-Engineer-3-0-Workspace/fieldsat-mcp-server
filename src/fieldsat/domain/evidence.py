@@ -19,6 +19,9 @@ class SatelliteEvidence:
     average_cloud_coverage_percentage: float
     usable_pixel_percentage: float
     periods_comparable: bool
+    # Free text from the imagery provider. Untrusted: agents must treat it as data,
+    # never as instructions.
+    provider_notes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

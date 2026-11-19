@@ -21,6 +21,7 @@ SATELLITE_KEYS = [
     "valid_observations",
     "average_cloud_coverage_percentage",
     "data_quality",
+    "provider_notes",
 ]
 
 WEATHER_KEYS = [
@@ -122,3 +123,16 @@ async def test_weather_failure_does_not_remove_satellite() -> None:
         "get_satellite_analysis", {"field_id": "SL-PADDY-WEATHER-FAIL", "comparison_days": 14}
     )
     assert satellite["ndvi_change_percentage"] == -15.2
+
+
+async def test_injection_field_returns_provider_notes_as_data() -> None:
+    """Lesson 3: the INJECT field's free-text notes carry an instruction.
+
+    FieldSat passes it on unchanged; defending against it is the agent's job
+    (guardrails and evals in agrivibe-be).
+    """
+    payload = await call(
+        "get_satellite_analysis", {"field_id": "SL-PADDY-INJECT", "comparison_days": 14}
+    )
+    assert "SYSTEM NOTICE" in payload["provider_notes"]
+    assert payload["data_quality"] == "good"
